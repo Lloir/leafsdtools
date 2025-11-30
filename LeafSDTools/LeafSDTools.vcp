@@ -295,15 +295,13 @@ DEP_CPP_WRITE=\
 	".\StdAfx.h"\
 	".\Touch.h"\
 	".\WriteNAND.h"\
-	
-NODEP_CPP_WRITE=\
-	".\dkmacro.h"\
-	".\eBus.h"\
-	".\eddk.h"\
-	".\funcs.h"\
-	".\m.h"\
-	".\oolhelp.h"\
-	".\tstatus.h"\
+	{$(INCLUDE)}"CeBus.h"\
+	{$(INCLUDE)}"ceddk.h"\
+	{$(INCLUDE)}"ddkmacro.h"\
+	{$(INCLUDE)}"ntstatus.h"\
+	{$(INCLUDE)}"pkfuncs.h"\
+	{$(INCLUDE)}"pm.h"\
+	{$(INCLUDE)}"toolhelp.h"\
 	
 
 !IF  "$(CFG)" == "LeafSDTools - Win32 (WCE SH4) Release"
@@ -318,22 +316,6 @@ NODEP_CPP_WRITE=\
 # Begin Source File
 
 SOURCE=.\WriteNAND_QY8.cpp
-DEP_CPP_WRITEN=\
-	".\Display.h"\
-	".\DisplayDirectDraw.h"\
-	".\Flash.h"\
-	".\Logger.h"\
-	".\StdAfx.h"\
-	".\Touch.h"\
-	".\WriteNAND.h"\
-	{$(INCLUDE)}"CeBus.h"\
-	{$(INCLUDE)}"ceddk.h"\
-	{$(INCLUDE)}"ddkmacro.h"\
-	{$(INCLUDE)}"ntstatus.h"\
-	{$(INCLUDE)}"pkfuncs.h"\
-	{$(INCLUDE)}"pm.h"\
-	{$(INCLUDE)}"toolhelp.h"\
-	
 
 !IF  "$(CFG)" == "LeafSDTools - Win32 (WCE SH4) Release"
 
@@ -348,19 +330,6 @@ DEP_CPP_WRITEN=\
 # Begin Source File
 
 SOURCE=.\Display.cpp
-
-!IF  "$(CFG)" == "LeafSDTools - Win32 (WCE SH4) Release"
-
-!ELSEIF  "$(CFG)" == "LeafSDTools - Win32 (WCE ARMV4I) Release"
-
-# PROP Exclude_From_Build 1
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
-SOURCE=.\DisplayDirectDraw.cpp
 DEP_CPP_DISPL=\
 	".\Display.h"\
 	".\DisplayDirectDraw.h"\
@@ -374,6 +343,35 @@ DEP_CPP_DISPL=\
 	{$(INCLUDE)}"pkfuncs.h"\
 	{$(INCLUDE)}"pm.h"\
 	{$(INCLUDE)}"toolhelp.h"\
+	
+
+!IF  "$(CFG)" == "LeafSDTools - Win32 (WCE SH4) Release"
+
+!ELSEIF  "$(CFG)" == "LeafSDTools - Win32 (WCE ARMV4I) Release"
+
+# PROP Exclude_From_Build 1
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=.\DisplayDirectDraw.cpp
+DEP_CPP_DISPLA=\
+	".\Display.h"\
+	".\DisplayDirectDraw.h"\
+	".\Font.h"\
+	".\Logger.h"\
+	".\StdAfx.h"\
+	{$(INCLUDE)}"kfuncs.h"\
+	
+NODEP_CPP_DISPLA=\
+	".\dkmacro.h"\
+	".\eBus.h"\
+	".\eddk.h"\
+	".\m.h"\
+	".\oolhelp.h"\
+	".\tstatus.h"\
 	
 
 !IF  "$(CFG)" == "LeafSDTools - Win32 (WCE SH4) Release"

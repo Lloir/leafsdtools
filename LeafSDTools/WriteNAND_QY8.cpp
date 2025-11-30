@@ -8,14 +8,14 @@
 
 const char* flashLabels[] = {"ALL+EEPROM", "ALL OS", "START", "CANCEL"};
 
-bool flashBlocks[3] = {false, false, false};
+bool flashBlocks[4] = {false, false, false, false};
 
 static DWORD bufferSize = 0x20000;
 
 
 void RenderFlashMenuOptions() {
     int y = 15;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 4; i++) {
         if (RenderButtonWithState(780, y, 150, 36, flashLabels[i], flashBlocks[i]) != 0) {
             break;
         }
