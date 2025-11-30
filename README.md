@@ -1,5 +1,6 @@
 # Leaf SD Tools
-<img src="https://github.com/developerfromjokela/leafsdtools/blob/master/leafsdtool.jpg" height="400">
+<img src="https://github.com/developerfromjokela/leafsdtools/blob/master/leafsdtool.png" height="400">
+<img src="https://github.com/developerfromjokela/leafsdtools/blob/master/leafsdtool_qy8xxx.png" height="400">
 Modify, backup and unlock your Head Unit with all-in-one utility.
 No hardware modifications are required.
 
