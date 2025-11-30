@@ -5,7 +5,7 @@ No hardware modifications are required.
 
 ## Current working functionality
 - [x] Backup NAND
-- [ ] Write NAND
+- [x] Write NAND
 - [x] Lock/Unlock SD cards using slot A
 - [x] Read&Write SRAM and VFlash (User Data)
 - [x] Retrieve SD Card pin
@@ -22,7 +22,7 @@ Launching the program happens from diagnostic menu of Head Unit.
 Have your SD card flashed with latest disk image available in releases.
 
 Supported Head Unit models: QY7XXX (CarWings), QY8XXX (NissanConnect)
-
+### GUIDE FOR QY7XXX
 1. With the head unit fully booted, enter the map view.
 2. Turn off media
 3. Press three times "MAP" button, then press media on/off button two times and finally press "MAP" button once again.
@@ -35,4 +35,13 @@ To exit from Software Update mode, insert stock SD card back and press YES when 
 
 > With version 104, you can also exit Software Update mode by pressing EXIT UPDATE button in main menu
 
-**NOTE! Make sure your stock SD is locked before exiting update mode! Head Unit won't boot back if SD is unlocked.**
+### GUIDE FOR QY8XXX
+1. Tilt the screen and remove SD. Insert SD with Leaf SD Tools
+2. Turn off and turn back on. The program will boot in a moment.
+
+TO EXIT THE PROGRAM:
+1. Press Exit Update
+2. Confirm the exit
+3. Once green screen appears, remove the SD and insert your stock card in. Turn off and back on, you'll boot back to the OS.
+
+**NOTE FOR QY7XXX ONLY! Make sure your stock SD is locked before exiting update mode! Head Unit won't boot back if SD is unlocked.**
