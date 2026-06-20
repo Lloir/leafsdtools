@@ -332,6 +332,26 @@ int InitGraphic() {
     return 0;
 }
 
+void DrawProgressBar(int x, int y, int w, int h, int progress, int max, WORD color) {
+    if (max <= 0) return;
+    DWORD* pixels;
+    if (LockSurface(surfaceHandles[g_surfaceIndex], (DWORD*)&pixels) != 0) return;
+
+    // Draw border
+    DrawRect(x, y, w, h, COLOR_WHITE, (WORD*)pixels, false);
+    // Fill background
+    DrawRect(x + 1, y + 1, w - 2, h - 2, COLOR_BLACK, (WORD*)pixels, false);
+    
+    // Calculate progress width
+    int progressW = (progress * (w - 4)) / max;
+    if (progressW > 0) {
+        DrawRect(x + 2, y + 2, progressW, h - 4, color, (WORD*)pixels, false);
+    }
+
+    UnlockSurface(surfaceHandles[g_surfaceIndex]);
+    SwapBuffers();
+}
+
 void ResetTextRenderer() {
 	g_xPos = 0;
     g_yPos = 0;

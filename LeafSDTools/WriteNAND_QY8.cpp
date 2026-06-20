@@ -4,7 +4,11 @@
 #include "Logger.h"
 #include "Display.h"
 #include "Touch.h"
+#include "Checksum.h"
 
+#ifndef BACKUP_HASH_ALGO
+#define BACKUP_HASH_ALGO HASH_SHA512
+#endif
 
 const char* flashLabels[] = {"ALL+EEPROM", "ALL OS", "START", "CANCEL"};
 
@@ -69,29 +73,80 @@ void RunWriteNAND() {
 
 		LogError(L"GetProdSection fail!", prodResult);
 		PrintToScreen(1, "Could not read device section: %u \n", prodResult);
-	} else {
-		char fileName[260] = {0};
-		sprintf(fileName, "\\SystemSD\\nand_%02X%02X%02X%02X_%02X%02X%02X%02X.bin", 
-			((BYTE*)productId)[0], ((BYTE*)productId)[1], ((BYTE*)productId)[2], ((BYTE*)productId)[3],
-			((BYTE*)serial)[0], ((BYTE*)serial)[1], ((BYTE*)serial)[2], ((BYTE*)serial)[3]);
-		FILE* backupFile = fopen(fileName, "rb");
-		bool backupFileValid = false;
-		long fileSize = 0;
-		if (backupFile != NULL) {
-			fseek(backupFile, 0, SEEK_END);
-			fileSize = ftell(backupFile);
-			fclose(backupFile);
-			backupFileValid = (fileSize > 8192);
-		}
+		} else {
+			char fileName[260] = {0};
+			sprintf(fileName, "\\SystemSD\\nand_%02X%02X%02X%02X_%02X%02X%02X%02X.bin", 
+				((BYTE*)productId)[0], ((BYTE*)productId)[1], ((BYTE*)productId)[2], ((BYTE*)productId)[3],
+				((BYTE*)serial)[0], ((BYTE*)serial)[1], ((BYTE*)serial)[2], ((BYTE*)serial)[3]);
+			
+			FILE* backupFile = fopen(fileName, "rb");
+			bool isPartial = false;
+			bool backupFileValid = false;
+			if (backupFile == NULL) {
+				// Try partial/partition files
+				backupFile = fopen("\\SystemSD\\nk.bin", "rb");
+				if (backupFile) {
+					isPartial = true;
+					PrintToScreen(1, "Using partial flash: nk.bin\n");
+				}
+			}
 
-		if (!backupFileValid) {
-			PrintToScreen(1, "Valid NAND Backup file not found! Cannot continue.\n");
+			long fileSize = 0;
+			if (backupFile != NULL) {
+				fseek(backupFile, 0, SEEK_END);
+				fileSize = ftell(backupFile);
+				fseek(backupFile, 0, SEEK_SET); // Reset to start
+				backupFileValid = (fileSize > 8192);
+			}
+
+			if (!backupFileValid) {
+				PrintToScreen(1, "No NAND Backup or nk.bin found! Cannot continue.\n");
 			for (int i = 0; i < 5; i++) {
 				PrintToScreen(1, "\rExiting in.. %u", 5-i);
 				Sleep(1000);
 			}
 		} else {
 			PrintToScreen(1, "Valid NAND backup found! Size: %u bytes\n", fileSize);
+
+			// Verify the image before flashing so we never write a corrupt
+			// payload onto the device.
+			if (isPartial) {
+				// Partial flash uses an NK.bin (B000FF) kernel image: validate
+				// its internal structure and per-record checksums.
+				char nkErr[64] = {0};
+				PrintToScreen(1, "Validating NK.bin structure...\n");
+				if (ValidateNkBin("\\SystemSD\\nk.bin", nkErr, sizeof(nkErr))) {
+					PrintToScreen(1, "NK.bin valid (B000FF). Records verified.\n");
+				} else {
+					PrintToScreen(1, "!INVALID NK.bin! (%s) Aborting.\n", nkErr);
+					fclose(backupFile);
+					for (int i = 0; i < 5; i++) {
+						PrintToScreen(1, "\rExiting in.. %u", 5-i);
+						Sleep(1000);
+					}
+					return;
+				}
+			} else {
+				// Full backup: verify against its checksum sidecar (if present).
+				int hashAlgo = BACKUP_HASH_ALGO;
+				const char* algoName = (hashAlgo == HASH_SHA512) ? "SHA512" : "MD5";
+				bool missing = false;
+				PrintToScreen(1, "Verifying %s checksum...\n", algoName);
+				if (VerifyChecksumSidecar(hashAlgo, fileName, &missing)) {
+					PrintToScreen(1, "Checksum OK. Backup is intact.\n");
+				} else if (missing) {
+					PrintToScreen(1, "!WARNING! No checksum file found, integrity unverified.\n");
+				} else {
+					PrintToScreen(1, "!CHECKSUM MISMATCH! Backup is CORRUPT. Aborting.\n");
+					fclose(backupFile);
+					for (int i = 0; i < 5; i++) {
+						PrintToScreen(1, "\rExiting in.. %u", 5-i);
+						Sleep(1000);
+					}
+					return;
+				}
+			}
+
 			flashBlocks[2] = true;
 
 			bool startFlash = false;
@@ -242,6 +297,7 @@ void RunWriteNAND() {
 						byteCounter += bufferSize;
 
 						PrintToScreen(1, "\r >> %u / %u", byteCounter, maxSize);
+						DrawProgressBar(50, 400, 500, 30, byteCounter, maxSize, 0xF800); // Red for writing
 
 						blockIndex++;
 					}
@@ -330,6 +386,7 @@ void RunWriteNAND() {
 						byteCounter += bufferSize;
 
 						PrintToScreen(1, "\r >> %u / %u", byteCounter, maxSize);
+						DrawProgressBar(50, 400, 500, 30, byteCounter, maxSize, 0xF800); // Red for writing
 
 						blockIndex++;
 					}

@@ -196,6 +196,14 @@ DEP_CPP_READN=\
 # End Source File
 # Begin Source File
 
+SOURCE=.\Checksum.cpp
+# End Source File
+# Begin Source File
+
+SOURCE=.\Tweaks.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\SDPinControl.cpp
 
 !IF  "$(CFG)" == "LeafSDTools - Win32 (WCE SH4) Release"

@@ -90,6 +90,7 @@ int RenderBtnText(int x, int y, const char* text, WORD color, int scale, WORD* p
 int RenderButton(int x_right, int y_top, int w, int h, const char* text);
 int RenderButtonWithState(int x_right, int y_top, int w, int h, const char* text, bool state);
 void ResetTextRenderer();
+void DrawProgressBar(int x, int y, int w, int h, int progress, int max, WORD color);
 
 
 

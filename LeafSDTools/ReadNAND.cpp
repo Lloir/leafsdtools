@@ -4,6 +4,13 @@
 #include "Logger.h"
 #include "Display.h"
 #include "Touch.h"
+#include "Checksum.h"
+
+// Default integrity algorithm used for NAND backups. Set to HASH_MD5 for a
+// faster (but weaker) check, or HASH_SHA512 for the strongest verification.
+#ifndef BACKUP_HASH_ALGO
+#define BACKUP_HASH_ALGO HASH_SHA512
+#endif
 
 void RunReadNAND(BOOL unattend) {
 	ResetTextRenderer();
@@ -131,6 +138,7 @@ void RunReadNAND(BOOL unattend) {
 				byteCounter += blockSize;
 
 				PrintToScreen(1, "\r >> %u / %u", byteCounter, maxSize);
+				DrawProgressBar(50, 400, 500, 30, byteCounter, maxSize, 0x07E0); // Green progress bar
 
 				counter++;
 			} while (counter <= MAX_BLOCKS);
@@ -140,6 +148,30 @@ void RunReadNAND(BOOL unattend) {
 			free(buffer);
 			free(ioControlInput);
 			PrintToScreen(1, "\nDone. Read %u bytes", byteCounter);
+
+			// Generate an integrity checksum for the freshly written backup so
+			// that it can be validated before it is ever flashed back.
+			int hashAlgo = BACKUP_HASH_ALGO;
+			const char* algoName = (hashAlgo == HASH_SHA512) ? "SHA512" : "MD5";
+			PrintToScreen(1, "\n\nCalculating %s checksum...\n", algoName);
+			char digest[129] = {0};
+			if (ComputeFileHash(hashAlgo, fileName, digest, sizeof(digest))) {
+				PrintToScreen(1, "%s: %s\n", algoName, digest);
+				if (WriteChecksumSidecar(hashAlgo, fileName)) {
+					// Re-read the file from the SD and confirm it still matches,
+					// catching any silent write/media corruption.
+					bool missing = false;
+					if (VerifyChecksumSidecar(hashAlgo, fileName, &missing)) {
+						PrintToScreen(1, "Backup verified OK.\n");
+					} else {
+						PrintToScreen(1, "WARNING: verification FAILED! Backup may be corrupt.\n");
+					}
+				} else {
+					PrintToScreen(1, "WARNING: could not write checksum file.\n");
+				}
+			} else {
+				PrintToScreen(1, "WARNING: could not calculate checksum.\n");
+			}
 		}
 		Sleep(5000);
 	}

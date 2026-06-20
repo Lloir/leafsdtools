@@ -7,8 +7,9 @@
 #include "UserSRAM.h"
 #include "SDPinControl.h"
 #include "ExitUpdateMode.h"
+#include "Tweaks.h"
 
-const char* labels[] = {"Read NAND", "Write NAND", "SRAM", "SD lock", "SD unlock", "EXIT UPDATE"};
+const char* labels[] = {"Read NAND", "Write NAND", "SRAM", "SD lock", "SD unlock", "TWEAKS", "EXIT UPDATE"};
 
 char* wchar_to_ascii(const wchar_t* wchar_str) {
     if (!wchar_str) return NULL;
@@ -31,11 +32,11 @@ void RenderMenuOptions() {
 
     int y = 20;
 
-    for (int i = 0; i < 6; i++) {
-        if (RenderButton(780, y, 180, 65, labels[i]) != 0) {
+    for (int i = 0; i < 7; i++) {
+        if (RenderButton(780, y, 180, 55, labels[i]) != 0) {
             break;
         }
-        y += 65 + 10; // Move down for next button
+        y += 55 + 5; // Move down for next button
     }
 }
 
@@ -176,7 +177,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 				LCDTouchEvent* touchEvt = WaitForTouch(INFINITE);
 				if (touchEvt != NULL) {
 					if (btn == -1) {
-						btn = GetPressedButton(touchEvt->xCoord, touchEvt->yCoord, 780, 20, 180, 65, 10, 6);
+						btn = GetPressedButton(touchEvt->xCoord, touchEvt->yCoord, 780, 20, 180, 55, 5, 7);
 						if (btn != -1 && NEW_NAV)
 							break;
 					}
@@ -204,6 +205,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 				RunSDPinControl(false);
 				break;
 			case 5:
+				RunTweaks();
+				break;
+			case 6:
 				RunExitUpdate();
 				break;
 			default:
