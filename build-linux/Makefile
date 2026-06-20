@@ -24,6 +24,7 @@ CC       := $(CROSS)gcc
 CXX      := $(CROSS)g++
 WINDRES  := $(CROSS)windres
 STRIP    := $(CROSS)strip
+PYTHON   := python3
 
 # Which head unit to target: QY8 (ARM, DirectDraw) or QY7 (SH4, GDI-sub).
 TARGET   ?= QY8
@@ -31,10 +32,13 @@ TARGET   ?= QY8
 # Windows CE version the headers/SDK target. mingw32ce normally defines
 # _WIN32_WCE itself; override here only if your SDK needs a specific value.
 WCEVER   ?= 0x420
+NKADDR   ?= 0x80200000
 
 SRCDIR   := ../LeafSDTools
 OUTDIR   := out/$(TARGET)
 BIN      := $(OUTDIR)/LeafSDTools.exe
+NKBIN    := $(OUTDIR)/nk.bin
+IMG      := $(OUTDIR)/LeafSDTools.img
 
 # --- Source selection ------------------------------------------------------
 # Sources compiled for every target.
@@ -109,6 +113,21 @@ $(BIN): $(OBJ) $(RES_OBJ)
 	$(STRIP) $@ || true
 	@echo ""
 	@echo "Built: $(BIN)  (TARGET=$(TARGET))"
+
+nkbin: $(BIN)
+	$(PYTHON) make_nk_bin.py $(BIN) $(NKBIN) $(NKADDR)
+	@echo "Built: $(NKBIN)"
+
+image: nkbin
+	@command -v mkfs.vfat >/dev/null 2>&1 || { echo "ERROR: mkfs.vfat not found"; exit 1; }
+	@command -v mcopy >/dev/null 2>&1 || { echo "ERROR: mcopy (mtools) not found"; exit 1; }
+	rm -f $(IMG)
+	truncate -s 128M $(IMG)
+	mkfs.vfat -F 32 $(IMG)
+	mcopy -i $(IMG) $(NKBIN) ::/nk.bin
+	@echo ""
+	@echo "Created SD image: $(IMG)"
+	@echo "You can now write this image to your SD card using Etcher or dd."
 
 clean:
 	rm -rf out

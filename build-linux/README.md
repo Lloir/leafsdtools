@@ -64,6 +64,12 @@ cd build-linux
 # QY8 (ARM) — the flashable target:
 make
 
+# Build the bootable NK.bin (B000FF format):
+make nkbin
+
+# Build a full 128MB SD card image (.img) ready for Etcher:
+make image
+
 # Clean:
 make clean
 
@@ -73,8 +79,14 @@ make TARGET=QY7
 
 Output:
 ```
-out/QY8/LeafSDTools.exe
+out/QY8/LeafSDTools.exe   # WinCE Executable
+out/QY8/nk.bin           # Bootable container (B000FF)
+out/QY8/LeafSDTools.img  # Raw 128MB SD image for Etcher
 ```
+
+> **Note on `nk.bin`**: The `nkbin` target wraps the `.exe` in a `B000FF` container.
+> This is useful for chainloading (e.g., via U-Boot) or if your unit's bootloader
+> can jump directly into the PE entry point. It is NOT a full WinCE kernel.
 
 Useful overrides:
 | Variable | Default            | Meaning                                    |
@@ -82,6 +94,7 @@ Useful overrides:
 | `CROSS`  | `arm-mingw32ce-`   | cross-toolchain prefix                     |
 | `TARGET` | `QY8`              | `QY8` (ARM/DirectDraw) or `QY7` (SH4/GDI)  |
 | `WCEVER` | `0x420`            | `_WIN32_WCE` / `UNDER_CE` value            |
+| `NKADDR` | `0x80200000`       | `nk.bin` load/execution address             |
 
 ---
 
