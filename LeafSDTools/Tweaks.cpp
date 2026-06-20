@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Tweaks.h"
+#include "LeafSDTools.h"
 #include "Display.h"
 #include "Touch.h"
 #include "Logger.h"

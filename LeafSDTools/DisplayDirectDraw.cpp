@@ -567,3 +567,25 @@ void ResetTextRenderer() {
     g_offsetX = 6;
     g_offsetY = 6;
 }
+
+void DrawProgressBar(int x, int y, int w, int h, int progress, int max, WORD color) {
+    if (max <= 0) return;
+    DWORD fb;
+    if (LockSurfaceAlt(surfaceHandles[0], &fb) != 0) return;
+
+    WORD* pixels = (WORD*)fb;
+
+    // Draw border
+    DrawRect(x, y, w, h, COLOR_WHITE, pixels, false);
+    // Fill background
+    DrawRect(x + 1, y + 1, w - 2, h - 2, COLOR_BLACK, pixels, false);
+    
+    // Calculate progress width
+    int progressW = (progress * (w - 4)) / max;
+    if (progressW > 0) {
+        DrawRect(x + 2, y + 2, progressW, h - 4, color, pixels, false);
+    }
+
+    UnlockSurface(surfaceHandles[0]);
+    SwapBuffers();
+}
