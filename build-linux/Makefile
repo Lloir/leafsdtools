@@ -65,7 +65,9 @@ endif
 
 SRC  := $(COMMON_SRC) $(TARGET_SRC)
 OBJ  := $(patsubst %.cpp,$(OUTDIR)/%.o,$(SRC))
-RES  := $(OUTDIR)/LeafSDTools.res.o
+# Only include the resource file if it contains actual resource definitions.
+# windres returns "no resources" and fails if the file is effectively empty.
+RES_OBJ := $(shell grep -Ei "ICON|BITMAP|CURSOR|MENU|DIALOG|STRINGTABLE|ACCELERATORS|RCDATA|VERSIONINFO" $(SRCDIR)/LeafSDTools.rc >/dev/null 2>&1 && echo "$(OUTDIR)/LeafSDTools.res.o")
 
 # --- Flags -----------------------------------------------------------------
 # A local shim include dir provides any DDK header (e.g. ceddk.h) that the
@@ -75,7 +77,7 @@ DEFS := $(TARGET_DEF) \
 	-DUNICODE -D_UNICODE -DNDEBUG -DWIN32_LEAN_AND_MEAN
 
 CPPFLAGS := -I$(SRCDIR) -Icompat $(DEFS)
-CXXFLAGS := -O2 -fno-exceptions -fno-rtti -Wno-write-strings -Wno-multichar
+CXXFLAGS := -O2 -fno-rtti -Wno-write-strings -Wno-multichar
 LDFLAGS  := -mwindows
 LDLIBS   := -lcoredll -lddraw
 
@@ -97,11 +99,11 @@ $(OUTDIR):
 $(OUTDIR)/%.o: $(SRCDIR)/%.cpp | $(OUTDIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-$(RES): $(SRCDIR)/LeafSDTools.rc | $(OUTDIR)
+$(RES_OBJ): $(SRCDIR)/LeafSDTools.rc | $(OUTDIR)
 	$(WINDRES) -I$(SRCDIR) $(DEFS) $< -O coff -o $@
 
-$(BIN): $(OBJ) $(RES)
-	$(CXX) $(LDFLAGS) $(OBJ) $(RES) $(LDLIBS) -o $@
+$(BIN): $(OBJ) $(RES_OBJ)
+	$(CXX) $(LDFLAGS) $(OBJ) $(RES_OBJ) $(LDLIBS) -o $@
 	$(STRIP) $@ || true
 	@echo ""
 	@echo "Built: $(BIN)  (TARGET=$(TARGET))"
