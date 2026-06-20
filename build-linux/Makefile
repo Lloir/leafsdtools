@@ -54,11 +54,11 @@ COMMON_SRC := \
 ifeq ($(TARGET),QY8)
   # QY8XXX: ARM head unit, DirectDraw display + partition-aware QY8 writer.
   TARGET_SRC := DisplayDirectDraw.cpp WriteNAND_QY8.cpp
-  TARGET_DEF := -DQY8XXX -DARM -D_ARM_ -DARMV4I
+  TARGET_DEF := -DQY8XXX -D_ARM_ -DARMV4I
 else ifeq ($(TARGET),QY7)
   # QY7XXX: GDI-sub display + classic NAND writer (SH4 in reality).
   TARGET_SRC := Display.cpp WriteNAND.cpp
-  TARGET_DEF := -DSHx -DSH4 -D_SH4_
+  TARGET_DEF := -DSHx -D_SH4_
 else
   $(error Unknown TARGET '$(TARGET)'. Use QY8 or QY7.)
 endif
@@ -71,7 +71,7 @@ RES  := $(OUTDIR)/LeafSDTools.res.o
 # A local shim include dir provides any DDK header (e.g. ceddk.h) that the
 # cegcc SDK may not ship. Real SDK headers still take precedence if present.
 DEFS := $(TARGET_DEF) \
-	-DUNDER_CE=$(WCEVER) -D_WIN32_WCE=$(WCEVER) \
+	-D_WIN32_WCE=$(WCEVER) \
 	-DUNICODE -D_UNICODE -DNDEBUG -DWIN32_LEAN_AND_MEAN
 
 CPPFLAGS := -I$(SRCDIR) -Icompat $(DEFS)

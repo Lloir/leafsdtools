@@ -417,7 +417,7 @@ int ScrollScreen() {
     return 0;
 }
 
-void DrawRect(int x, int y, int w, int h, WORD color, WORD* pixels) {
+void DrawRect(int x, int y, int w, int h, WORD color, WORD* pixels, bool transparent) {
 	for (int py = y; py < y + h && py < g_height; py++) {
         if (py < 0) continue;
         for (int px = x; px < x + w && px < g_width; px++) {
@@ -428,7 +428,7 @@ void DrawRect(int x, int y, int w, int h, WORD color, WORD* pixels) {
 }
 
 
-void DrawChar(byte c, int x, int y, WORD color, int scale, WORD* pixels, bool transparent) {
+void DrawChar(BYTE c, int x, int y, WORD color, int scale, WORD* pixels, bool transparent) {
     int charIndex = c - 0x20;
     if (charIndex > 96) {
         charIndex = 31;
@@ -461,7 +461,7 @@ void DrawChar(byte c, int x, int y, WORD color, int scale, WORD* pixels, bool tr
 int RenderBtnText(int x, int y, const char* text, WORD color, int scale, WORD* pixels) {
     int x_offset = x;
     for (int i = 0; text[i] != '\0'; i++) {
-		DrawChar((byte)text[i], x_offset, y, color, scale, pixels, true);
+  DrawChar((BYTE)text[i], x_offset, y, color, scale, pixels, true);
         x_offset += g_charWidth * scale;
     }
     return 0;
@@ -589,7 +589,7 @@ int ClearArea(int x, int y, int w, int h) {
 }
 
 
-int RenderChar(byte c, int x, int y, WORD color, int scale, bool transparent) {
+int RenderChar(BYTE c, int x, int y, WORD color, int scale, bool transparent) {
     if (c < 0x20) c = 0x20;
     if (scale < 1) scale = 1;
 
@@ -629,7 +629,7 @@ void AdjustBoundaries(int x) {
     g_maxX = x / g_charWidth - 1;
 }
 
-int RenderStringWithScale(const byte* str, int scale) {
+int RenderStringWithScale(const BYTE* str, int scale) {
     int origY = g_yPos;
     while (*str) {
         if (*str == '\r') {
@@ -666,12 +666,12 @@ int RenderStringWithScale(const byte* str, int scale) {
     return 0;
 }
 
-int RenderString(const byte* str) {
+int RenderString(const BYTE* str) {
     return RenderStringWithScale(str, 1);
 }
 
 
-void PrintScreenWithScale(const byte* str, int scale) {
+void PrintScreenWithScale(const BYTE* str, int scale) {
 	if (LOG_PIXELS == 1) {
 		LogError(L"PrintScreen, surfaceindex:", g_surfaceIndex);
 		LogError(L"PrintScreen, scale:", scale);
@@ -681,7 +681,7 @@ void PrintScreenWithScale(const byte* str, int scale) {
 	SetupRenderContext();
 }
 
-void PrintScreen(const byte* str) {
+void PrintScreen(const BYTE* str) {
 	PrintScreenWithScale(str, 1);
 }
 
@@ -711,6 +711,6 @@ void PrintToScreen(int scale, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vsprintf(buffer, format, args);
-    PrintScreenWithScale((byte*)buffer, scale);
+    PrintScreenWithScale((BYTE*)buffer, scale);
     va_end(args);
 }

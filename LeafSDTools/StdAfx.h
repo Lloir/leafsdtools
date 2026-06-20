@@ -10,7 +10,9 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
+#endif
 
 #ifdef QY8XXX
 #define NEW_NAV true
