@@ -292,7 +292,7 @@ BOOL WriteProdDataToFile(int block, BYTE* prodData, DWORD dataSize) {
 
     CloseHandle(hFile);
 
-	LogError(L"Saved prodbin to \SystemSD\??prod.bin", 0);
+	LogError(L"Saved prodbin to \\SystemSD\\??prod.bin", 0);
     return TRUE;
 }
 

@@ -116,7 +116,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     }
 	if (!NEW_NAV)
 		InitSDCards();
+#ifdef _MSC_VER
     __try {
+#else
+    try {
+#endif
 
 		while (TRUE) {
 			Sleep(50);
@@ -217,7 +221,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 			ResetTextRenderer();
 		}
 
+#ifdef _MSC_VER
     } __except (EXCEPTION_EXECUTE_HANDLER) {
+#else
+    } catch (...) {
+#endif
 		// Avoid trapping in update mode, quit on failure
 	    if (NEW_NAV) 
 		  SetBootMode();
@@ -225,11 +233,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 	    DrawBackground(0xF000);
 		AdjustTextPosition(0, 0);
 		Sleep(100);
+#ifdef _MSC_VER
 	    wsprintf(errorMsg, L"Exception occurred: 0x%08X", GetExceptionCode());
+#else
+	    wsprintf(errorMsg, L"Exception occurred");
+#endif
 		PrintToScreen(4, "F   A   T   A   L       E   R   R\n\n\n");
 		PrintToScreen(1, wchar_to_ascii(errorMsg));
 		Sleep(100);
+#ifdef _MSC_VER
         LogError(errorMsg, GetExceptionCode());
+#else
+        LogError(errorMsg, 0);
+#endif
     }
 	DestroySurfaces();
     CleanupLog();

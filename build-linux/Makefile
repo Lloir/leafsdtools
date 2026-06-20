@@ -78,8 +78,8 @@ DEFS := $(TARGET_DEF) \
 
 CPPFLAGS := -I$(SRCDIR) -Icompat $(DEFS)
 CXXFLAGS := -O2 -fno-rtti -Wno-write-strings -Wno-multichar
-LDFLAGS  := -mwindows
-LDLIBS   := -lcoredll -lddraw
+LDFLAGS  := 
+LDLIBS   := -lcoredll
 
 # --- Rules -----------------------------------------------------------------
 .PHONY: all clean toolcheck
@@ -99,8 +99,10 @@ $(OUTDIR):
 $(OUTDIR)/%.o: $(SRCDIR)/%.cpp | $(OUTDIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
+ifneq ($(RES_OBJ),)
 $(RES_OBJ): $(SRCDIR)/LeafSDTools.rc | $(OUTDIR)
 	$(WINDRES) -I$(SRCDIR) $(DEFS) $< -O coff -o $@
+endif
 
 $(BIN): $(OBJ) $(RES_OBJ)
 	$(CXX) $(LDFLAGS) $(OBJ) $(RES_OBJ) $(LDLIBS) -o $@

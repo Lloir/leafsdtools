@@ -290,11 +290,20 @@ int InitGraphic() {
 		if (!virtualAddr) {
 			LogError(L"Failed to map framebuffer", 0);
 		} else {
+#ifdef _MSC_VER
 			__try {
+#else
+			try {
+#endif
 				memset(virtualAddr, 0, surfaces[i].bufferSize);
 				LogError(L"Framebuffer cleared successfully", 0);
+#ifdef _MSC_VER
 			}
 			__except (EXCEPTION_EXECUTE_HANDLER) {
+#else
+			}
+			catch (...) {
+#endif
 				LogError(L"Exception during framebuffer clear", GetLastError());
 			}
 

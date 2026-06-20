@@ -8,6 +8,7 @@
 */
 
 // Function type definitions
+typedef HRESULT (WINAPI *DirectDrawCreateProc)(GUID *, LPDIRECTDRAW *, IUnknown *);
 typedef HRESULT (WINAPI *CreateSurfaceFunc)(LPDIRECTDRAW, BYTE *, LPDIRECTDRAWSURFACE *, IUnknown *);
 typedef HRESULT (WINAPI *SetCooperativeLevelFunc)(LPDIRECTDRAW, HWND, DWORD);
 typedef HRESULT (WINAPI *BltFunc)(LPDIRECTDRAWSURFACE, RECT *, LPDIRECTDRAWSURFACE, RECT *, DWORD, LPDDBLTFX);
@@ -32,6 +33,7 @@ DWORD surfaceHandles[2] = { 0xffffffff, 0xffffffff };
 LPDIRECTDRAW g_ddContext;
 LPDIRECTDRAWSURFACE g_ddSurface;
 LPDIRECTDRAWSURFACE g_ddPrimarySurface;
+HMODULE g_hDDraw = NULL;
 
 static const BYTE PixelData[32] = {
     0x20, 0x00, 0x00, 0x00,
@@ -65,8 +67,28 @@ int InitGraphic() {
 		SerialLog("Running DirectDrawCreate");
 
     // Create DirectDraw object
-    hr = DirectDrawCreate(NULL, &g_ddContext, NULL);
+    g_hDDraw = LoadLibrary(L"ddraw.dll");
+    if (!g_hDDraw) {
+        LogError(L"LoadLibrary ddraw.dll failed", GetLastError());
+        return -0x7fffbffb;
+    }
+    DirectDrawCreateProc pDirectDrawCreate = (DirectDrawCreateProc)GetProcAddress(g_hDDraw, L"DirectDrawCreate");
+    if (!pDirectDrawCreate) {
+        // Some systems might have it decorated or by ordinal, but usually it's plain DirectDrawCreate on WinCE
+        pDirectDrawCreate = (DirectDrawCreateProc)GetProcAddress(g_hDDraw, L"DirectDrawCreate@12");
+    }
+
+    if (!pDirectDrawCreate) {
+        FreeLibrary(g_hDDraw);
+        g_hDDraw = NULL;
+        LogError(L"GetProcAddress DirectDrawCreate failed", GetLastError());
+        return -0x7fffbffb;
+    }
+
+    hr = pDirectDrawCreate(NULL, &g_ddContext, NULL);
     if (FAILED(hr)) {
+        FreeLibrary(g_hDDraw);
+        g_hDDraw = NULL;
         LogError(L"DirectDrawCreate failed", hr);
         return -0x7fffbffb;
     }
@@ -191,13 +213,17 @@ int DestroySurfaces() {
         g_ddSurface->Release();
         g_ddSurface = NULL;
     }
-	if (g_ddSurface) {
+	if (g_ddPrimarySurface) {
         g_ddPrimarySurface->Release();
         g_ddPrimarySurface = NULL;
     }
     if (g_ddContext) {
         g_ddContext->Release();
         g_ddContext = NULL;
+    }
+    if (g_hDDraw) {
+        FreeLibrary(g_hDDraw);
+        g_hDDraw = NULL;
     }
     surfaceHandles[0] = 0xffffffff;
     surfaceHandles[1] = 0xffffffff;
