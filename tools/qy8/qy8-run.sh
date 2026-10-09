@@ -14,6 +14,11 @@
 #   IMMO      1 = keep the stored immobiliser setting
 #   USBSTICK  path to a raw FAT image to attach as a USB mass storage device
 #             on the unit's own EHCI/OHCI port (see make_test_stick.sh)
+#   QY8_TRACE  QEMU trace-event glob to fold into guest.log via the "log"
+#              backend, e.g. QY8_TRACE='cypress_ttsp_*' to see every I2C
+#              command/write and reported (x,y) the touch model gets --
+#              the ground truth for whether a tap ever reaches it at all,
+#              independent of any guest-side driver/IRQ behaviour.
 #   DIPSW     boot mode, 0-7 (default 1 = NORM(EVA), the normal nav boot).
 #             5 = NORM(RES). 4 makes the bootloader boot from flash offset
 #             0x60000 instead of the normal nav image (clarion_qy8.c calls
@@ -92,6 +97,6 @@ exec "$here/build/qemu-system-arm" \
     -display "$display" \
     -chardev socket,id=ser0,path="$work/ser.sock",server=on,wait=off,logfile="$work/console.log" \
     -serial chardev:ser0 \
-    -d guest_errors,unimp -D "$work/guest.log" \
+    -d "guest_errors,unimp${QY8_TRACE:+,trace:$QY8_TRACE}" -D "$work/guest.log" \
     -msg timestamp=on \
     -qmp unix:"$work/q.sock",server,nowait 2>"$work/qemu.log"
