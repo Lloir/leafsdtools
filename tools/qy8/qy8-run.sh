@@ -14,6 +14,10 @@
 #   IMMO      1 = keep the stored immobiliser setting
 #   USBSTICK  path to a raw FAT image to attach as a USB mass storage device
 #             on the unit's own EHCI/OHCI port (see make_test_stick.sh)
+#   DIPSW     boot mode, 0-7 (default 1 = NORM(EVA), the normal nav boot).
+#             5 = NORM(RES). 4 makes the bootloader boot from flash offset
+#             0x60000 instead of the normal nav image (clarion_qy8.c calls
+#             this "update mode" in a comment) -- unverified what it shows.
 #
 # Then, in another terminal:   python3 tools/qy8/qy8_console.py <work dir>/ser.sock
 # Everything the unit prints is also saved in <work dir>/console.log.
@@ -70,7 +74,7 @@ echo "work dir: $work"
 echo "console:  python3 $(dirname "$0")/qy8_console.py $work/ser.sock"
 echo "QMP:      $work/q.sock      (Ctrl-C here quits)"
 exec "$here/build/qemu-system-arm" \
-    -M clarion-qy8,board="$board",dipsw=1,du-dotclk=33333333 \
+    -M clarion-qy8,board="$board",dipsw="${DIPSW:-1}",du-dotclk=33333333 \
     -drive if=pflash,format=raw,file="$work/nand.bin" \
     -drive if=sd,index=0,format=raw,file="$work/card.img" \
     "${stick[@]}" \
