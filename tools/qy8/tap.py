@@ -4,11 +4,17 @@ bypassing the GTK window (so it works headless too), and print the wall
 time it was sent so the moment can be lined up against guest.log (run
 qy8-run.sh with -msg timestamp=on, already the default).
 
-    tap.py SOCK [X] [Y] [--hold MS]
+    tap.py SOCK [X] [Y] [--hold MS] [--no-release]
 
 X/Y are screen pixels in the unit's native 800x480 (default: screen center,
 400x240). Sends an absolute pointer move to (X,Y), a left button down, a
 hold (default 80ms), then a button up -- a normal single tap.
+
+--no-release leaves the button held down (no up event sent) so you can
+screendump.py the display mid-press, e.g. to check for any visual feedback
+(cursor, button highlight) before deciding touch is fully silent. Release
+it afterwards with:  tap.py SOCK X Y --hold 0   (down+immediate up at the
+same spot clears the held state either way).
 """
 import argparse
 import datetime
@@ -56,6 +62,7 @@ def main():
     ap.add_argument("x", type=int, nargs="?", default=SCREEN_W // 2)
     ap.add_argument("y", type=int, nargs="?", default=SCREEN_H // 2)
     ap.add_argument("--hold", type=int, default=80, help="button-down hold time in ms (default 80)")
+    ap.add_argument("--no-release", action="store_true", help="leave the button held down, don't send the up event")
     args = ap.parse_args()
 
     f = connect(args.sock)
@@ -69,6 +76,11 @@ def main():
 
     import time
     time.sleep(args.hold / 1000.0)
+
+    if args.no_release:
+        print("button left DOWN (no up event sent) -- screendump now if you want,"
+              " release later with: tap.py SOCK %d %d --hold 0" % (args.x, args.y))
+        return
 
     send_input_event(f, [{"type": "btn", "data": {"down": False, "button": "left"}}])
     t1 = datetime.datetime.now()
