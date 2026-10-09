@@ -25,7 +25,7 @@ import struct
 import sys
 from collections import Counter
 
-VERSION = "4 (files-only regions, ROMHDR scan, diagnostics)"
+VERSION = "5 (header copies, table search, diagnostics)"
 BLOCK = 0x20000  # 128 KB, QY8 (NEW_NAV) read size used by ReadNAND.cpp
 
 KEYWORDS = [
@@ -95,6 +95,16 @@ def cstr(data, off, maxlen=260):
     return s.decode("ascii")
 
 
+def hexrows(data, start, n=0x60):
+    start = max(start, 0)
+    return ["    %08X  %s" % (start + i, data[start + i:start + i + 16].hex(" "))
+            for i in range(0, n, 16) if start + i < len(data)]
+
+
+def fmt_off(v):
+    return "-0x%X" % -v if v < 0 else "0x%X" % v
+
+
 def sane_header(h):
     """A files-only region has nummods == 0, so only require numfiles then."""
     if not (0 <= h["nummods"] < 5000 and 0 <= h["numfiles"] < 1000000):
@@ -141,40 +151,55 @@ def parse_rom(data, ecec_off, out):
     return None
 
 
+def locate_toc(data, hdr_file, h, base, image_start):
+    """Find the module (or file) table after a ROMHDR. Returns (offset, score)."""
+    n = h["nummods"]
+    esz, name_at = (TOC_SIZE, 16) if n else (FILE_SIZE, 20)
+    cnt = n if n else h["numfiles"]
+    probe = min(cnt, 8)
+    best = None
+    for delta in range(0x40, 0x200, 4):
+        t = hdr_file + delta
+        if t + probe * esz > len(data):
+            break
+        ok = 0
+        for i in range(probe):
+            ptr, = struct.unpack_from("<I", data, t + i * esz + name_at)
+            if cstr(data, image_start + (ptr - base)):
+                ok += 1
+        if ok >= max(1, probe * 3 // 4) and (best is None or ok > best[1]):
+            best = (t, ok)
+            if ok == probe:
+                break
+    return best
+
+
 def dump_rom(data, image_start, parsed, out, modules_out):
     base, hdr_file, h = parsed
 
     def v2f(v):
         return image_start + (v - base)
 
-    out.append("== ROM image @ file 0x%X ==" % image_start)
+    out.append("== ROM image (virtual base maps to file %s), header @0x%X ==" %
+               (fmt_off(image_start), hdr_file))
     out.append("  physfirst=0x%08X physlast=0x%08X (%d KB)" %
                (h["physfirst"], h["physlast"], (h["physlast"] - h["physfirst"]) // 1024))
     out.append("  modules=%d files=%d RAM 0x%08X-0x%08X" %
                (h["nummods"], h["numfiles"], h["ulRAMStart"], h["ulRAMEnd"]))
 
-    toc = hdr_file + 0x4C  # TOC follows the 0x4C-byte ROMHDR on common builds
-    # Locate the TOC robustly: the first TOCentry's name pointer must resolve
-    # to a printable string.
-    found = False
-    name_at = 16 if h["nummods"] else 20   # TOC entry vs files-only entry
-    for delta in range(0x40, 0xA0, 4):
-        t = hdr_file + delta
-        if t + TOC_SIZE > len(data):
-            break
-        name_ptr, = struct.unpack_from("<I", data, t + name_at)
-        if cstr(data, v2f(name_ptr)):
-            toc = t
-            found = True
-            break
-    if not found:
-        out.append("  (could not locate the module table; header layout differs)")
-        return
+    loc = locate_toc(data, hdr_file, h, base, image_start)
+    if not loc:
+        out.append("  (could not locate the module table; header bytes follow)")
+        out.extend(hexrows(data, hdr_file, 0x120))
+        return False
+    toc = loc[0]
 
     n = h["nummods"]
     modules = []
     for i in range(n):
         t = toc + i * TOC_SIZE
+        if t + TOC_SIZE > len(data):
+            break
         attrs, = struct.unpack_from("<I", data, t)
         size, name_ptr = struct.unpack_from("<II", data, t + 12)
         name = cstr(data, v2f(name_ptr)) or "?"
@@ -192,23 +217,18 @@ def dump_rom(data, image_start, parsed, out, modules_out):
         files.append((name, real, comp))
 
     out.append("  %d modules, %d files parsed (see modules.txt)" % (len(modules), len(files)))
-    if len(files) > 3000:
-        out.append("  (modules.txt lists only the first 3000 files of this image)")
-        files = files[:3000]
-    modules_out.append("# ROM image @ file 0x%X" % image_start)
+    modules_out.append("# ROM image, header @0x%X, virtual base -> file %s" % (hdr_file, fmt_off(image_start)))
     modules_out.append("## modules (DLL/EXE)")
     for name, size, attrs in sorted(modules, key=lambda m: m[0].lower()):
         modules_out.append("%-40s %10d" % (name, size))
     modules_out.append("## files")
+    if len(files) > 3000:
+        out.append("  (modules.txt lists only the first 3000 files of this image)")
+        files = files[:3000]
     for name, real, comp in sorted(files, key=lambda f: f[0].lower()):
         modules_out.append("%-40s %10d (compressed %d)" % (name, real, comp))
     modules_out.append("")
-
-
-def hexrows(data, start, n=0x60):
-    start = max(start, 0)
-    return ["    %08X  %s" % (start + i, data[start + i:start + i + 16].hex(" "))
-            for i in range(0, n, 16) if start + i < len(data)]
+    return True
 
 
 def scan_romhdrs(data):
@@ -272,16 +292,26 @@ def find_roms(data, out, modules_out):
             continue
         out.append("  header candidate @0x%X physfirst=0x%08X physlast=0x%08X mods=%d files=%d" %
                    (hdr_file, h["physfirst"], h["physlast"], h["nummods"], h["numfiles"]))
-        match = [e for e in eceps if e[1] - e[2] == h["physfirst"] and e[0] + e[2] == hdr_file]
-        if not match:
-            match = [e for e in eceps if e[1] - e[2] == h["physfirst"]]
-        if match:
-            image_start = hdr_file - match[0][2]
+        # Two hypotheses for where the region's virtual base lies in the file:
+        # the signature's own offset says this header is the one it points at,
+        # or the header is a copy near the start of the region.
+        hyps = []
+        for e in eceps:
+            if e[1] - e[2] == h["physfirst"]:
+                hyps.append(hdr_file - e[2])
+                hyps.append(e[0])
+        best = None
+        for img in dict.fromkeys(hyps):
+            r = locate_toc(data, hdr_file, h, h["physfirst"], img)
+            if r and (best is None or r[1] > best[1]):
+                best = (img, r[1])
+        if best:
             done.add(hdr_file)
             count += 1
-            dump_rom(data, image_start, (h["physfirst"], hdr_file, h), out, modules_out)
+            dump_rom(data, best[0], (h["physfirst"], hdr_file, h), out, modules_out)
         else:
-            out.extend(hexrows(data, hdr_file, 0x60))
+            out.append("    no table found under either hypothesis; header bytes:")
+            out.extend(hexrows(data, hdr_file, 0x120))
 
     if not count:
         out.append("  No parseable ROMHDR found. The OS may be stored compressed or in")
