@@ -71,6 +71,38 @@ Ways forward: (a) brute-force the virtual->file mapping against E32 structures;
 (b) boot the dump in the qemu-clarion emulator (it already handles G214ELNI.112) and
 read the modules from RAM through the debug shell or gdb stub.
 
+## USB host stack (from the emulator RAM dump + disassembly)
+
+How to get the data: boot the dump in qemu-clarion, `pmemsave 0x08000000 134217728` of
+RAM (VA 0x88000000 = PA 0x08000000), then `tools/analyze_ram.py` (module list, flat
+module images, export lists). Module images are 32-bit ARM code.
+
+- The nav image has 282 modules; the OS image 94; a small region 17; a 25 MB skin file.
+- `mqusbh.dll` (Nov 24 2016 build) is a complete third-party USB host stack, NOT the
+  standard Windows CE USBD. It contains OHCI + EHCI drivers, the hub class and an internal
+  `usbd*` layer, and EXPORTS its API (110 names). Notable exports:
+  `usbdCreatePipe`, `usbdDestroyPipe`, `usbdDataTransfer`, `usbdDeviceRequest`(2),
+  `usbdGetDeviceDesc`/`ConfigDesc`/`InterfaceDesc`/`EndpointDesc`, `usbdAbortPipe`,
+  `usbdResetPipe`, `usbdClearEndpointStall`, `usbdSetIsoBufPipe`,
+  `usbClassDrvInstall`/`Uninstall`, `usbdSetUnknownDeviceHandler`,
+  `usbdUnknownDeviceGet`, `usbdSetHubErrorStateHandler`, `usbdSysGetHcInfo`.
+- Class drivers are stream drivers that sit on top: `umass2.dll` (MSC_*/USD_*),
+  `uheadset.dll` (HSC_*), `ipodusb.dll` (POD_*), `UsbIpodMgr.dll` (UIM_*), `ucdc*.dll`.
+  Manager apps: `Usb.exe` (753 KB), `UsbConMngCC.dll` (COM component).
+- Verified by disassembly (mqusbh.dll): `usbdSetUnknownDeviceHandler(fn)` stores one
+  function pointer and returns 0. The stack later calls `fn()` with no arguments;
+  `usbdUnknownDeviceGet(uint32_t *a, uint32_t *b)` then pops one queued record and returns
+  its two words (0 = ok, -1 = none). This is the natural hook for a phone (Android) that no
+  class driver claims. What `a` and `b` mean is not yet determined.
+- Plan sketch: handler -> fetch device -> send the Android accessory (AOA) vendor requests
+  with `usbdDeviceRequest` -> phone re-enumerates -> claim the accessory interface with a
+  class driver registered through `usbClassDrvInstall` -> bulk IN/OUT with `usbdDataTransfer`.
+  Function signatures still have to be recovered from the existing class drivers.
+- No H.264 decoder and no Wi-Fi driver in the image; TLS support unknown (schannel present).
+- Open: how to get our own driver loaded in kernel mode without editing the ROM, and
+  whether the emulator's EHCI model can pass a real phone through (libusb is enabled in the
+  build) so the protocol can be developed on a PC first.
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
