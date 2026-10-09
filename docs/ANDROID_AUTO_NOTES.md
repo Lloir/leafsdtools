@@ -46,6 +46,31 @@ Source: <https://github.com/albertbm/qemu-clarion/tree/qy8-bridge> (`README-QY8.
 - No hardware video decoder is mentioned in the emulator. H.264 at 800x480 would
   likely have to be decoded in software on the A9 (to be verified).
 
+## NAND layout findings (QY8252NF, G114ELNI.112 / G214ELNI.112)
+
+From `tools/analyze_nand.py` on a real 64 MB dump (offsets are file offsets):
+
+- `0x000000` boot stage 1, `0x060000` boot stage 2 (each a tiny `nk.exe`).
+- `0x1C0000` OS image `G114ELNI.112`: ROM base 0x88000000, 94 modules, 14 files.
+  Fully parsed (kernel, gwes, coredll, SDHC, serial_scif, ddraw, gdisub, Camera.exe,
+  VIN.dll, waveapic, tomato_RDSTMCDAB_ML (tuner), ...). No USB host driver here.
+- `0x1C2AB8` files-only region `ObjSubstance.skn` (25.7 MB UI skin), VA 0x8E100000.
+- `0x9064F0` onwards: chunks of the navigation/app image `G214ELNI.112`
+  (label at 0xAC0016). Its ROMHDR (copies at 0x9074F0 and 0x27FA5A0):
+  physfirst 0x88840000, physlast 0x8B49F1E8 (~45 MB), 282 modules, 43 files,
+  CPU type 0x01C2 (Thumb), TOC at header+0x54 with 32-byte entries. A second
+  region at 0x8B8D0000 has 17 modules.
+- Not solved: the TOC's name/E32 pointers (e.g. first name ptr 0x88AD3FEC) do not map
+  linearly to file offsets, so the 282 module names cannot be listed from the file yet.
+  The image seems stored as several chunks, each starting with `<name>\0 ... ECEC
+  <ptr> <off>`. The nav module bodies themselves (UsbConMngCC, ws2.dll, ...) are
+  stored uncompressed.
+- The runtime debug log inside the dump shows `mqusbh.dll` loaded at 0xEEE00000.
+
+Ways forward: (a) brute-force the virtual->file mapping against E32 structures;
+(b) boot the dump in the qemu-clarion emulator (it already handles G214ELNI.112) and
+read the modules from RAM through the debug shell or gdb stub.
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
