@@ -12,6 +12,8 @@
 #   TMPDIR    where the working copies go. They are 16 GiB, so NOT a tmpfs /tmp.
 #   HEADLESS  1 = no window
 #   IMMO      1 = keep the stored immobiliser setting
+#   USBSTICK  path to a raw FAT image to attach as a USB mass storage device
+#             on the unit's own EHCI/OHCI port (see make_test_stick.sh)
 #
 # Then, in another terminal:   python3 tools/qy8/qy8_console.py <work dir>/ser.sock
 # Everything the unit prints is also saved in <work dir>/console.log.
@@ -51,6 +53,17 @@ export QY8_GL_FRAME="$work/glframe.bin"
 glarg="$here/build/contrib/plugins/$plugin,syms=$glsyms,log=$work/gl.log"
 [ -z "$IMMO" ] && glarg="$glarg,cnf=0x0f:0"
 
+stick=()
+if [ -n "$USBSTICK" ]; then
+    [ -f "$USBSTICK" ] || { echo "no such file: $USBSTICK" >&2; exit 1; }
+    # a copy: the guest can write to a real USB stick (e.g. it may set a
+    # "notify" flag after reading RunProgram.s), so don't touch the original
+    cp "$USBSTICK" "$work/stick.img"
+    stick=(-drive if=none,id=stick0,format=raw,file="$work/stick.img"
+           -device usb-storage,drive=stick0)
+    echo "USB stick: $USBSTICK (as $work/stick.img)"
+fi
+
 echo "work dir: $work"
 echo "console:  python3 $(dirname "$0")/qy8_console.py $work/ser.sock"
 echo "QMP:      $work/q.sock      (Ctrl-C here quits)"
@@ -58,6 +71,7 @@ exec "$here/build/qemu-system-arm" \
     -M clarion-qy8,board="$board",dipsw=1,du-dotclk=33333333 \
     -drive if=pflash,format=raw,file="$work/nand.bin" \
     -drive if=sd,index=0,format=raw,file="$work/card.img" \
+    "${stick[@]}" \
     -plugin "$glarg" \
     -display "$display" \
     -chardev socket,id=ser0,path="$work/ser.sock",server=on,wait=off,logfile="$work/console.log" \

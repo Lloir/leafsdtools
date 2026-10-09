@@ -133,6 +133,37 @@ insertion / maintenance mode only), and which volume names map to which physical
 Next step: extract MaintenanceCC.dll and AppLaunch.dll with tools/analyze_ram.py and read
 the code that opens RunProgram.s.
 
+### MaintenanceInit traced (disassembly of the extracted MaintenanceCC.dll)
+
+Right after boot, `MaintenanceInit` builds an 8-entry table of all the
+`EnableDbgShell.sh` / `RunProgram.s` paths (one per `\USB Disk`, `\USB Disk2`,
+`\SystemSD`, `\UserSD`), then loops over it: for each entry it calls a check
+function (file offset 0x4fce4 in the extracted image) and, if that returns
+nonzero, a second function (0x4fb18), then marks the slot done. From how the
+table is built, the `\USB Disk` entries look like the ones checked by
+default; the others read as fallbacks. Not yet confirmed: what the two called
+functions actually do (very plausibly "does file exist" / "run it"), and the
+exact content format `RunProgram.s` expects.
+
+### Test harness: a virtual USB stick for the emulator
+
+qemu-clarion's EHCI/OHCI are QEMU's real USB host models (not just register
+stubs), so a FAT-formatted raw image can be attached as a USB mass storage
+device on the unit's own USB port, in the emulator, with no car involved:
+
+- `tools/qy8/make_test_stick.sh OUT.img ['RunProgram.s line']` builds a FAT16
+  image with an empty `EnableDbgShell.sh` and a one-line `RunProgram.s` at its
+  root. Needs `mkfs.vfat` + `mcopy` (Arch: `dosfstools` `mtools`). NOT run
+  against a real build here (this container has neither tool); only
+  `bash -n` syntax-checked.
+- `qy8-run.sh` now takes `USBSTICK=path/to/image.img` and attaches it as
+  `-device usb-storage` on the emulated unit's host port (on a copy, so the
+  guest can scribble on it freely).
+
+Next: boot with a test stick, watch console.log for any reaction when the
+drive appears, to learn the real file format and confirm the hook is live
+(this has not been run yet).
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
