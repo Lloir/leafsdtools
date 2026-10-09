@@ -164,6 +164,40 @@ Next: boot with a test stick, watch console.log for any reaction when the
 drive appears, to learn the real file format and confirm the hook is live
 (this has not been run yet).
 
+### MaintenanceInit's check() function, traced
+
+File offset 0xfce4 in the extracted MaintenanceCC.dll (vbase 0x42A40000):
+`CreateFile(path, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)`,
+then (if the handle is valid and a nonzero size was requested) a read of the raw
+file bytes into a caller buffer, then CloseHandle, returning 1 if the file
+existed. No encoding assumption is baked in at this layer; whatever interprets
+the buffer afterward (`launch`, 0xfb18) hasn't been traced yet.
+
+### Emulator USB limitation found (qemu-clarion, this fork's EHCI model)
+
+Confirmed via tools/qy8/ehci_portsc.py, reading PORTSC/USBSTS directly: a
+usb-storage device attached via `-device`/`device_add` lands in the port
+already CurrentConnectStatus=1 AND PortEnabled=1, with BOTH change bits
+(ConnectStatusChange, PortEnableChange) and USBSTS.PCD left at 0 — i.e. no
+insert edge/interrupt ever fires for the guest. Tried both at cold boot and
+via hot device_del/device_add; same result both times. The guest's USB driver
+(mqusbh.dll) never reads the device descriptor (checked via RAM string search
+for "QEMU USB MSD", absent both times) and nothing appears in console.log.
+
+This reads as a QEMU EHCI *emulation* gap (devices presented pre-enabled
+instead of a real insert sequence), not evidence against the mechanism on
+real hardware: real QY8 units are well known to support USB flash drives for
+music, and umass2.dll's class-driver registration (traced via
+usb_callsites.py: class=8, subclass 5/6, vendorId=0 productId=0 — a wildcard,
+no VID/PID filtering) confirms generic mass-storage devices are accepted.
+
+Next: untestable further in the emulator without attaching a live debugger to
+force the port-change bits by hand (not attempted — diminishing returns).
+The decisive test for RunProgram.s / EnableDbgShell.sh now needs the real
+unit. First real-car test should be a deliberately safe probe (a RunProgram.s
+naming a program that does not exist), to learn whether the hook fires at all
+before ever pointing it at something real.
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
