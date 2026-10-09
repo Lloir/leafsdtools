@@ -45,6 +45,17 @@ Source: <https://github.com/albertbm/qemu-clarion/tree/qy8-bridge> (`README-QY8.
 - Our unit (QY8252NF, EU) should match its ZE0 board (QY8202NA): `BOARD=ze0`.
 - No hardware video decoder is mentioned in the emulator. H.264 at 800x480 would
   likely have to be decoded in software on the A9 (to be verified).
+- Touch input works end to end in the emulator (model, I2C, IRQ, driver ISR all
+  verified correct via `QY8_TRACE=cypress_ttsp_*` -- see `tools/qy8/tap.py` and
+  `tools/qy8/screendump.py`). The telematics consent screen looked unresponsive
+  to every tap/click (scripted and real mouse) because it enforces a mandatory
+  several-second read delay before the OK button becomes clickable -- not a bug.
+  If a screen ever seems touch-dead again, wait ~30-60s before concluding
+  anything is broken.
+- Needed `albertbm/qemu-clarion` commit "qy8gl: answer DDWaitForBltDone at once"
+  (from PR alexpalyan/qemu-clarion#1) to avoid a ~10 minute stall between the
+  consent screen and the map screen appearing (SGX blit-complete is never
+  signalled by the model; the plugin now fakes it). Already in `qy8-bridge`.
 
 ## NAND layout findings (QY8252NF, G114ELNI.112 / G214ELNI.112)
 
