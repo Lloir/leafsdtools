@@ -29,6 +29,23 @@ Status: research / feasibility. Nothing here is proven on hardware yet.
   versions have broken older aasdk-based code, so expect protocol work.
   <https://github.com/f1xpl/openauto>
 
+## Hardware, from the QY8 emulator (albertbm/qemu-clarion, branch qy8-bridge)
+
+Source: <https://github.com/albertbm/qemu-clarion/tree/qy8-bridge> (`README-QY8.md`,
+`hw/arm/clarion_qy8.c`). Its memory map was read from the unit's own bootloader.
+
+- SoC: Renesas R8A7778 (R-Car M1A), single Cortex-A9. Windows CE runs XIP from NAND.
+- GPU: PowerVR SGX. Display unit, SD hosts (SDHI), I2C, CAN, SCIF serial ports.
+- USB host: EHCI + OHCI at 0xFFE70000 with a USB PHY at 0xFFE70800. The firmware's
+  USB driver enumerates devices in the emulator. This answers unknown 1 (a USB
+  host exists in the OS). Whether we can drive it from our own code is still open.
+- The emulator boots the unit from a leafsdtools NAND dump plus a map SD image,
+  has a debug shell, touch input and a software UI renderer. Not emulated: map,
+  camera video, audio, CAN data.
+- Our unit (QY8252NF, EU) should match its ZE0 board (QY8202NA): `BOARD=ze0`.
+- No hardware video decoder is mentioned in the emulator. H.264 at 800x480 would
+  likely have to be decoded in software on the A9 (to be verified).
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
