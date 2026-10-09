@@ -19,6 +19,10 @@
 #              command/write and reported (x,y) the touch model gets --
 #              the ground truth for whether a tap ever reaches it at all,
 #              independent of any guest-side driver/IRQ behaviour.
+#   QY8_GDB    1 = start a GDB stub on tcp::1234 (the HMP "gdbserver"
+#              command can fail to create its chardev on some builds;
+#              this starts it at launch instead, which still just listens
+#              -- boots normally, attach with gdb whenever you want).
 #   DIPSW     boot mode, 0-7 (default 1 = NORM(EVA), the normal nav boot).
 #             5 = NORM(RES). 4 makes the bootloader boot from flash offset
 #             0x60000 instead of the normal nav image (clarion_qy8.c calls
@@ -85,6 +89,12 @@ if [ -n "$USBSTICK" ]; then
     echo "  hot-replug: qmp.py \$WORK/q.sock 'device_add usb-storage,id=usbstick0,drive=stick0'"
 fi
 
+gdb=()
+if [ -n "$QY8_GDB" ]; then
+    gdb=(-gdb tcp::1234)
+    echo "GDB:      gdb -ex 'target remote localhost:1234'"
+fi
+
 echo "work dir: $work"
 echo "console:  python3 $(dirname "$0")/qy8_console.py $work/ser.sock"
 echo "QMP:      $work/q.sock      (Ctrl-C here quits)"
@@ -93,6 +103,7 @@ exec "$here/build/qemu-system-arm" \
     -drive if=pflash,format=raw,file="$work/nand.bin" \
     -drive if=sd,index=0,format=raw,file="$work/card.img" \
     "${stick[@]}" \
+    "${gdb[@]}" \
     -plugin "$glarg" \
     -display "$display" \
     -chardev socket,id=ser0,path="$work/ser.sock",server=on,wait=off,logfile="$work/console.log" \
