@@ -23,7 +23,14 @@
 # Everything the unit prints is also saved in <work dir>/console.log.
 # <work dir>/guest.log has QEMU's guest_errors/unimp trace (e.g. the TMA616
 # touch controller's known spurious power-up edge, logged as an "unsupported
-# config" message -- worth checking if taps aren't registering on ZE0).
+# config" message -- worth checking if taps aren't registering on ZE0), now
+# timestamped (-msg timestamp=on) so it can be lined up against the moment
+# of a tap sent with tools/qy8/tap.py <work dir>/q.sock. Suggested workflow:
+#   tail -f <work dir>/guest.log &
+#   python3 tools/qy8/tap.py <work dir>/q.sock 400 240
+# and compare the printed "tap sent at ..." time against guest.log lines
+# that appear right after it (vs. the steady background noise already
+# there before the tap).
 # This only reads your NAND and card; the guest writes to copies.
 set -e
 here=${QY8_QEMU:-$HOME/source/qemu-clarion}
@@ -86,4 +93,5 @@ exec "$here/build/qemu-system-arm" \
     -chardev socket,id=ser0,path="$work/ser.sock",server=on,wait=off,logfile="$work/console.log" \
     -serial chardev:ser0 \
     -d guest_errors,unimp -D "$work/guest.log" \
+    -msg timestamp=on \
     -qmp unix:"$work/q.sock",server,nowait 2>"$work/qemu.log"
