@@ -196,9 +196,24 @@ def find_roms(data, out, modules_out):
         if parsed:
             count += 1
             dump_rom(data, off, parsed, out, modules_out)
+        else:
+            # Help diagnose images the parser does not understand yet.
+            rv = struct.unpack_from("<I", data, off + 4)[0] if off + 8 <= len(data) else 0
+            out.append("  ECEC at 0x%X (image start 0x%X): ROMHDR ptr 0x%08X, could not parse" %
+                       (off, off - 0x40, rv))
+            start = max(off - 0x40, 0)
+            for i in range(0, 0x80, 16):
+                row = data[start + i:start + i + 16]
+                out.append("    %08X  %s" % (start + i, row.hex(" ")))
     if not count:
         out.append("  No parseable ROMHDR found. The OS may be stored compressed or in")
         out.append("  a vendor container; the keyword search below still works.")
+    # Image labels such as G114ELNI.112 (OS) / G214ELNI.112 (navigation app).
+    for m in re.finditer(rb"G[0-9]{3}[A-Z]{4}\.[0-9]{2,4}", data):
+        out.append("  image label %s at 0x%X" % (m.group().decode(), m.start()))
+        start = max(m.start() - 0x20, 0)
+        for i in range(0, 0x60, 16):
+            out.append("    %08X  %s" % (start + i, data[start + i:start + i + 16].hex(" ")))
     for m in re.finditer(rb"B000FF\n", data):
         out.append("  B000FF record header at 0x%X" % m.start())
     out.append("")
