@@ -117,6 +117,22 @@ module images, export lists). Module images are 32-bit ARM code.
   (`usbdGetNewFdInfo`, `usbdSetFdInfo`, `usbdIndexToFdInfo`). A bulk CDC data driver is
   therefore the closest template for an Android accessory driver (bulk in + bulk out).
 
+## Getting our code to run: built-in script hooks (strings in the nav image)
+
+`CMaintenanceCtl::MaintenanceInit` (MaintenanceCC.dll, probably) references these paths,
+each in four locations (`\USB Disk`, `\USB Disk2`, `\SystemSD`, `\UserSD`):
+
+- `EnableDbgShell.sh`   (presence probably enables the debug shell)
+- `RunProgram.s`        (a script that names programs to start)
+
+Nearby: `Launch Process Create!!! -> %s`, `Launch Process Create Success!!!`,
+`Launch Process Not Create!!! -> %s`, `Autorun information = %d`. If `RunProgram.s` works
+as the names suggest, a text file on a USB stick or SD card runs our executable at boot
+with no firmware edit. Still to determine: file format, when it is read (boot / device
+insertion / maintenance mode only), and which volume names map to which physical slot.
+Next step: extract MaintenanceCC.dll and AppLaunch.dll with tools/analyze_ram.py and read
+the code that opens RunProgram.s.
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
