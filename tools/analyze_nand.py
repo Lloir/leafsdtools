@@ -25,6 +25,7 @@ import struct
 import sys
 from collections import Counter
 
+VERSION = "3 (follows the in-image ROMHDR offset)"
 BLOCK = 0x20000  # 128 KB, QY8 (NEW_NAV) read size used by ReadNAND.cpp
 
 KEYWORDS = [
@@ -286,7 +287,7 @@ def main():
         data = f.read()
     os.makedirs(args.outdir, exist_ok=True)
 
-    out = ["File: %s" % args.dump, "Size: %d bytes (0x%X)" % (len(data), len(data)), ""]
+    out = ["analyze_nand version %s" % VERSION, "File: %s" % args.dump, "Size: %d bytes (0x%X)" % (len(data), len(data)), ""]
     if len(data) % BLOCK:
         out.append("WARNING: size is not a multiple of 0x%X; layout assumptions may be off.\n" % BLOCK)
     modules_out = []
