@@ -25,7 +25,7 @@ import struct
 import sys
 from collections import Counter
 
-VERSION = "3 (follows the in-image ROMHDR offset)"
+VERSION = "4 (files-only regions, ROMHDR scan, diagnostics)"
 BLOCK = 0x20000  # 128 KB, QY8 (NEW_NAV) read size used by ReadNAND.cpp
 
 KEYWORDS = [
@@ -95,6 +95,17 @@ def cstr(data, off, maxlen=260):
     return s.decode("ascii")
 
 
+def sane_header(h):
+    """A files-only region has nummods == 0, so only require numfiles then."""
+    if not (0 <= h["nummods"] < 5000 and 0 <= h["numfiles"] < 1000000):
+        return False
+    if h["nummods"] == 0 and h["numfiles"] == 0:
+        return False
+    if not (0x80000000 <= h["physfirst"] < 0xC0000000):
+        return False
+    return h["physfirst"] < h["physlast"] <= h["physfirst"] + 0x10000000
+
+
 def parse_rom(data, ecec_off, out):
     """Try to parse the ROM image whose 'ECEC' marker is at ecec_off."""
     image_start = ecec_off - 0x40
@@ -109,9 +120,7 @@ def parse_rom(data, ecec_off, out):
         h = dict(zip(ROMHDR_FIELDS, vals))
         if strict and h["physfirst"] != base:
             return None
-        if not (0 < h["nummods"] < 5000 and 0 <= h["numfiles"] < 50000):
-            return None
-        if h["physlast"] <= h["physfirst"]:
+        if not sane_header(h):
             return None
         return base, hdr_file, h
 
@@ -132,9 +141,8 @@ def parse_rom(data, ecec_off, out):
     return None
 
 
-def dump_rom(data, ecec_off, parsed, out, modules_out):
+def dump_rom(data, image_start, parsed, out, modules_out):
     base, hdr_file, h = parsed
-    image_start = ecec_off - 0x40
 
     def v2f(v):
         return image_start + (v - base)
@@ -149,11 +157,12 @@ def dump_rom(data, ecec_off, parsed, out, modules_out):
     # Locate the TOC robustly: the first TOCentry's name pointer must resolve
     # to a printable string.
     found = False
-    for delta in range(0x40, 0x90, 4):
+    name_at = 16 if h["nummods"] else 20   # TOC entry vs files-only entry
+    for delta in range(0x40, 0xA0, 4):
         t = hdr_file + delta
         if t + TOC_SIZE > len(data):
             break
-        name_ptr, = struct.unpack_from("<I", data, t + 16)
+        name_ptr, = struct.unpack_from("<I", data, t + name_at)
         if cstr(data, v2f(name_ptr)):
             toc = t
             found = True
@@ -183,6 +192,9 @@ def dump_rom(data, ecec_off, parsed, out, modules_out):
         files.append((name, real, comp))
 
     out.append("  %d modules, %d files parsed (see modules.txt)" % (len(modules), len(files)))
+    if len(files) > 3000:
+        out.append("  (modules.txt lists only the first 3000 files of this image)")
+        files = files[:3000]
     modules_out.append("# ROM image @ file 0x%X" % image_start)
     modules_out.append("## modules (DLL/EXE)")
     for name, size, attrs in sorted(modules, key=lambda m: m[0].lower()):
@@ -193,40 +205,91 @@ def dump_rom(data, ecec_off, parsed, out, modules_out):
     modules_out.append("")
 
 
+def hexrows(data, start, n=0x60):
+    start = max(start, 0)
+    return ["    %08X  %s" % (start + i, data[start + i:start + i + 16].hex(" "))
+            for i in range(0, n, 16) if start + i < len(data)]
+
+
+def scan_romhdrs(data):
+    """Signature-less search for ROMHDR-looking structures (4-byte aligned)."""
+    if sys.byteorder != "little" or len(data) % 4:
+        return []
+    view = memoryview(data).cast("I")
+    hits = []
+    for i in range(len(view) - 13):
+        pf = view[i + 2]
+        if not (0x80000000 <= pf < 0xC0000000):
+            continue
+        pl = view[i + 3]
+        if not (pf < pl <= pf + 0x10000000):
+            continue
+        nm = view[i + 4]
+        if nm >= 5000 or not (view[i + 5] <= view[i + 6] <= view[i + 7]):
+            continue
+        h = dict(zip(ROMHDR_FIELDS, view[i:i + 13]))
+        if sane_header(h) and view[i + 5] >= 0x80000000:
+            hits.append((i * 4, h))
+    return hits
+
+
 def find_roms(data, out, modules_out):
     out.append("== WINCE ROM IMAGES ==")
+    done = set()       # header file offsets already parsed
+    eceps = []         # (image_start, ptr, off) of every plausible signature
     count = 0
+
     for m in re.finditer(b"ECEC", data):
         off = m.start()
-        if off < 0x40:
+        if off < 0x40 or off + 12 > len(data):
             continue
-        if data[off - 4:off] == b"\x3d\x43\x3d\x43" or data[off:off + 8].count(b"\x43") > 3:
-            continue  # counter-like data, not a ROM signature
+        ptr, hoff = struct.unpack_from("<II", data, off + 4)
+        if not (0x80000000 <= ptr < 0xC0000000):
+            continue  # not a ROM signature (e.g. counter-like data)
+        eceps.append((off - 0x40, ptr, hoff))
         try:
             parsed = parse_rom(data, off, out)
         except struct.error:
             parsed = None
         if parsed:
             count += 1
-            dump_rom(data, off, parsed, out, modules_out)
+            done.add(parsed[1])
+            dump_rom(data, off - 0x40, parsed, out, modules_out)
         else:
-            # Help diagnose images the parser does not understand yet.
-            rv = struct.unpack_from("<I", data, off + 4)[0] if off + 8 <= len(data) else 0
-            out.append("  ECEC at 0x%X (image start 0x%X): ROMHDR ptr 0x%08X, could not parse" %
-                       (off, off - 0x40, rv))
-            start = max(off - 0x40, 0)
-            for i in range(0, 0x80, 16):
-                row = data[start + i:start + i + 16]
-                out.append("    %08X  %s" % (start + i, row.hex(" ")))
+            out.append("  ECEC at 0x%X (image start 0x%X): ROMHDR ptr 0x%08X offset 0x%X, could not parse" %
+                       (off, off - 0x40, ptr, hoff))
+            out.extend(hexrows(data, off - 0x40, 0x80))
+            cand = off - 0x40 + hoff
+            out.append("    candidate header at 0x%X:" % cand)
+            out.extend(hexrows(data, cand, 0x60))
+
+    # Fallback: find headers without relying on the ECEC marker and match
+    # each to a signature whose (pointer - offset) equals its physfirst.
+    hits = scan_romhdrs(data)
+    out.append("  signature-less header scan: %d candidate(s)" % len(hits))
+    for hdr_file, h in hits:
+        if hdr_file in done:
+            continue
+        out.append("  header candidate @0x%X physfirst=0x%08X physlast=0x%08X mods=%d files=%d" %
+                   (hdr_file, h["physfirst"], h["physlast"], h["nummods"], h["numfiles"]))
+        match = [e for e in eceps if e[1] - e[2] == h["physfirst"] and e[0] + e[2] == hdr_file]
+        if not match:
+            match = [e for e in eceps if e[1] - e[2] == h["physfirst"]]
+        if match:
+            image_start = hdr_file - match[0][2]
+            done.add(hdr_file)
+            count += 1
+            dump_rom(data, image_start, (h["physfirst"], hdr_file, h), out, modules_out)
+        else:
+            out.extend(hexrows(data, hdr_file, 0x60))
+
     if not count:
         out.append("  No parseable ROMHDR found. The OS may be stored compressed or in")
         out.append("  a vendor container; the keyword search below still works.")
     # Image labels such as G114ELNI.112 (OS) / G214ELNI.112 (navigation app).
     for m in re.finditer(rb"G[0-9]{3}[A-Z]{4}\.[0-9]{2,4}", data):
         out.append("  image label %s at 0x%X" % (m.group().decode(), m.start()))
-        start = max(m.start() - 0x20, 0)
-        for i in range(0, 0x60, 16):
-            out.append("    %08X  %s" % (start + i, data[start + i:start + i + 16].hex(" ")))
+        out.extend(hexrows(data, m.start() - 0x20, 0x60))
     for m in re.finditer(rb"B000FF\n", data):
         out.append("  B000FF record header at 0x%X" % m.start())
     out.append("")
