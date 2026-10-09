@@ -3,7 +3,7 @@
 
 #include <windows.h>
 
-#define TOOL_VERSION "109-beta"
+#define TOOL_VERSION "110-beta"
 
 int GetPressedButton(int x, int y, int x_right, int y_top, int w, int h, int gap, int num_buttons);
 
