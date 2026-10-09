@@ -27,7 +27,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analyze_nand as an  # noqa: E402
 
-VERSION = "1"
+VERSION = "2 (adds export lists)"
 IMAGE_SCN_COMPRESSED = 0x2000
 
 
@@ -74,6 +74,39 @@ def module_table(data, va_base, region):
     return out
 
 
+def parse_exports(img, e32_bytes, modname):
+    """List named exports from the flat image. The export unit's slot inside
+    e32_rom varies by build, so try each slot and keep the one whose directory
+    names this module."""
+    for uo in range(0x18, 0x48, 4):
+        rva = struct.unpack_from("<I", e32_bytes, uo)[0]
+        if not rva or rva + 40 > len(img):
+            continue
+        name_rva = struct.unpack_from("<I", img, rva + 12)[0]
+        nm = an.cstr(bytes(img), name_rva) if 0 < name_rva < len(img) else None
+        if not nm or nm.lower().split(".dll")[0] != modname.lower().split(".dll")[0]:
+            continue
+        base, nfun, nnam, af, an_, ao = struct.unpack_from("<IIIIII", img, rva + 16)
+        names = {}
+        for k in range(min(nnam, 5000)):
+            try:
+                ordn = struct.unpack_from("<H", img, ao + 2 * k)[0]
+                nrva = struct.unpack_from("<I", img, an_ + 4 * k)[0]
+            except struct.error:
+                break
+            names[ordn] = an.cstr(bytes(img), nrva) or "?"
+        lines = []
+        for k in range(min(nfun, 5000)):
+            try:
+                a = struct.unpack_from("<I", img, af + 4 * k)[0]
+            except struct.error:
+                break
+            if a:
+                lines.append("%5d 0x%08X %s" % (base + k, a, names.get(k, "")))
+        return lines
+    return None
+
+
 def extract(data, va_base, mods, want, outdir, report):
     """Rebuild a flat memory image of one module from its e32/o32 tables."""
     for name, e32, o32, load in mods:
@@ -108,6 +141,14 @@ def extract(data, va_base, mods, want, outdir, report):
         with open(path, "wb") as f:
             f.write(img)
         report.append("  wrote %s (%d bytes)" % (path, len(img)))
+        exps = parse_exports(img, data[e:e + 0x60], name)
+        if exps is None:
+            report.append("  exports: not found in the rebuilt image (may sit in a compressed section)")
+        else:
+            epath = os.path.join(outdir, "%s.exports.txt" % name)
+            with open(epath, "w") as f:
+                f.write("\n".join(exps))
+            report.append("  exports: %d written to %s" % (len(exps), epath))
         return
     report.append("%s: not found in any module table" % want)
 
