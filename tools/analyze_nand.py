@@ -97,27 +97,37 @@ def cstr(data, off, maxlen=260):
 def parse_rom(data, ecec_off, out):
     """Try to parse the ROM image whose 'ECEC' marker is at ecec_off."""
     image_start = ecec_off - 0x40
-    if image_start < 0:
+    if image_start < 0 or ecec_off + 12 > len(data):
         return None
-    romhdr_virt, = struct.unpack_from("<I", data, ecec_off + 4)
+    romhdr_virt, romhdr_off = struct.unpack_from("<II", data, ecec_off + 4)
 
-    # Image is stored flat: file = image_start + (virt - physfirst).
-    # physfirst is inside ROMHDR itself, so test candidate bases until the
-    # header found at the implied position agrees with the candidate.
-    for step in range(0, len(data), 0x1000):
-        base = (romhdr_virt & ~0xFFF) - step
-        hdr_file = image_start + (romhdr_virt - base)
+    def check(base, hdr_file, strict):
         if hdr_file < 0 or hdr_file + STABLE_SIZE > len(data):
-            continue
+            return None
         vals = struct.unpack_from(STABLE_FMT, data, hdr_file)
         h = dict(zip(ROMHDR_FIELDS, vals))
-        if h["physfirst"] != base:
-            continue
-        if not (0 < h["nummods"] < 2000 and 0 <= h["numfiles"] < 20000):
-            continue
+        if strict and h["physfirst"] != base:
+            return None
+        if not (0 < h["nummods"] < 5000 and 0 <= h["numfiles"] < 50000):
+            return None
         if h["physlast"] <= h["physfirst"]:
-            continue
+            return None
         return base, hdr_file, h
+
+    # 1. The word after the ROMHDR pointer is the header's offset inside the
+    #    image, which gives the image base directly (works for chained XIP
+    #    regions that do not start on a block boundary).
+    if 0 < romhdr_off < len(data) and romhdr_virt >= romhdr_off:
+        r = check(romhdr_virt - romhdr_off, image_start + romhdr_off, False)
+        if r:
+            return r
+
+    # 2. Otherwise search for a base whose header agrees with itself.
+    for step in range(0, len(data), 0x1000):
+        base = (romhdr_virt & ~0xFFF) - step
+        r = check(base, image_start + (romhdr_virt - base), True)
+        if r:
+            return r
     return None
 
 
@@ -189,6 +199,8 @@ def find_roms(data, out, modules_out):
         off = m.start()
         if off < 0x40:
             continue
+        if data[off - 4:off] == b"\x3d\x43\x3d\x43" or data[off:off + 8].count(b"\x43") > 3:
+            continue  # counter-like data, not a ROM signature
         try:
             parsed = parse_rom(data, off, out)
         except struct.error:
