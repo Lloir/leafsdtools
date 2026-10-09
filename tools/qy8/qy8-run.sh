@@ -21,6 +21,9 @@
 #
 # Then, in another terminal:   python3 tools/qy8/qy8_console.py <work dir>/ser.sock
 # Everything the unit prints is also saved in <work dir>/console.log.
+# <work dir>/guest.log has QEMU's guest_errors/unimp trace (e.g. the TMA616
+# touch controller's known spurious power-up edge, logged as an "unsupported
+# config" message -- worth checking if taps aren't registering on ZE0).
 # This only reads your NAND and card; the guest writes to copies.
 set -e
 here=${QY8_QEMU:-$HOME/source/qemu-clarion}
@@ -82,4 +85,5 @@ exec "$here/build/qemu-system-arm" \
     -display "$display" \
     -chardev socket,id=ser0,path="$work/ser.sock",server=on,wait=off,logfile="$work/console.log" \
     -serial chardev:ser0 \
+    -d guest_errors,unimp -D "$work/guest.log" \
     -qmp unix:"$work/q.sock",server,nowait 2>"$work/qemu.log"
