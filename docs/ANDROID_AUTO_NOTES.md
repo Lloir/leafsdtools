@@ -103,6 +103,20 @@ module images, export lists). Module images are 32-bit ARM code.
   whether the emulator's EHCI model can pass a real phone through (libusb is enabled in the
   build) so the protocol can be developed on a PC first.
 
+### Recovered call signatures (from ucdc.dll disassembly, tools/qy8/usb_callsites.py)
+
+- `int usbClassDrvInstall(uint8 classId, uint8 subClassId, uint16 vendorId, uint16 productId,
+   fn cb1 ... fn cb11)` : 4 register arguments (r0-r3) plus eleven callback pointers on the
+  stack; returns a class index, -1 on failure. ucdc.dll reads class/subclass/vid/pid from
+  its registry settings (defaults class 2, subclass 2, 0, 0 = CDC ACM). Some callbacks
+  create/abort pipes and issue control requests (set/get line coding). Roles of the 11
+  callbacks are not yet mapped.
+- `ucdc.dll` imports `usbdCreatePipe`, `usbdDataTransfer`, `usbdDeviceRequest`,
+  `usbdAbortPipe`, `usbdResetPipe`, `usbdClearEndpointStall`, `usbdGetConfigDesc`,
+  `usbdGetEndpointAddress`, `usbdPipeToDevice/Interface/Endpoint` and fd-info helpers
+  (`usbdGetNewFdInfo`, `usbdSetFdInfo`, `usbdIndexToFdInfo`). A bulk CDC data driver is
+  therefore the closest template for an Android accessory driver (bulk in + bulk out).
+
 ## Unknowns that decide feasibility
 
 1. Does the Windows CE image contain a USB **host** stack the app side can use
