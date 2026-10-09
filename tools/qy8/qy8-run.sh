@@ -60,8 +60,10 @@ if [ -n "$USBSTICK" ]; then
     # "notify" flag after reading RunProgram.s), so don't touch the original
     cp "$USBSTICK" "$work/stick.img"
     stick=(-drive if=none,id=stick0,format=raw,file="$work/stick.img"
-           -device usb-storage,drive=stick0)
+           -device usb-storage,id=usbstick0,drive=stick0)
     echo "USB stick: $USBSTICK (as $work/stick.img)"
+    echo "  hot-unplug: qmp.py \$WORK/q.sock 'device_del usbstick0'"
+    echo "  hot-replug: qmp.py \$WORK/q.sock 'device_add usb-storage,id=usbstick0,drive=stick0'"
 fi
 
 echo "work dir: $work"
